@@ -54,12 +54,25 @@ public class BoardsController {
 //		return "redirect:/";
 //	} // writeDto에 to ENTITY를 만들어서 쓰는게 위 코드보다 편함! // 인증체크도 해야함
 
+	
+	// http://localhost:8000/
+	// http://localhost:8000/?page=0
 	@GetMapping({ "/", "/boards" })
-	public String getBoardList(Model model) {
-		List<MainDto> boardsList = boardsDao.findAll();
+	public String getBoardList(Model model, Integer page) {	// 0=0,1=10,2=20를 요청할것임
+		if(page == null) page = 0;
+
+		int startNum = page * 10;
+		List<MainDto> boardsList = boardsDao.findAll(startNum);
 		model.addAttribute("boardsList", boardsList);
 		return "boards/main";
 	}
+	
+//	@GetMapping({ "/", "/boards" })
+//	public String getBoardList(Model model) {
+//		List<MainDto> boardsList = boardsDao.findAll();
+//		model.addAttribute("boardsList", boardsList);
+//		return "boards/main";
+//	}
 
 	@GetMapping("/boards/{id}")
 	public String getBoardList(@PathVariable Integer id, Model model) {
