@@ -4,10 +4,12 @@ import java.sql.Timestamp;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+@NoArgsConstructor
 //setter는 잘 안쓰는게 좋음
-
+@Setter
 @Getter
 public class Boards {
 	private Integer id;
