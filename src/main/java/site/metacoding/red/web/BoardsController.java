@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import lombok.RequiredArgsConstructor;
+import site.metacoding.red.domain.boards.Boards;
 import site.metacoding.red.domain.boards.BoardsDao;
 import site.metacoding.red.domain.users.Users;
 import site.metacoding.red.web.dto.request.boards.WriteDto;
 import site.metacoding.red.web.dto.response.boards.MainDto;
+import site.metacoding.red.web.dto.response.boards.PagingDto;
 
 @RequiredArgsConstructor
 @Controller
@@ -22,6 +24,29 @@ public class BoardsController {
 
 	private final HttpSession session;
 	private final BoardsDao boardsDao;
+	
+	@PostMapping("/boards/{id}/delete")	// 원래 주소에 동사는 적으면 안됨!
+	public String deleteBoards(@PathVariable Integer id) { 
+		// 1.영속화 시키기
+		Boards boardsPS = boardsDao.findById(id);
+		Users principal = (Users) session.getAttribute("principal");
+		// 비정상 요청 체크
+		if(boardsPS == null) {	// if는 비정상 로직을 하게 해서 걸러내는 필터 역할을 하는게 좋다.
+			return "redirect:/boards/"+id;   // 글 상세보기 주소로
+		}
+		// 화면의 수정,삭제 버튼이 본인만 보여야함
+		// 인증 체크
+		if (principal == null) {
+			return "redirect:/loginForm";
+		}
+		// 권한 체크( 세션: principal.getId() & boardsPS의 userId를 비교 )
+		if(principal.getId() != boardsPS.getUsersId()) {
+			return "redirect:/boards/"+id;
+		}
+			
+		boardsDao.delete(id);		
+		return "redirect:/";
+	}
 
 	@PostMapping("/boards") // writeBoards코드 리팩토링
 	public String writeBoards(WriteDto writeDto) {
@@ -58,12 +83,33 @@ public class BoardsController {
 	// http://localhost:8000/
 	// http://localhost:8000/?page=0
 	@GetMapping({ "/", "/boards" })
-	public String getBoardList(Model model, Integer page) {	// 0=0,1=10,2=20를 요청할것임
-		if(page == null) page = 0;
+	public String getBoardList(Model model, Integer page) { // 0 -> 0, 1->10, 2->20
+		if (page == null)
+			page = 0;
+		int startNum = page * 3; // 1. 수정함
 
-		int startNum = page * 10;
 		List<MainDto> boardsList = boardsDao.findAll(startNum);
+		PagingDto paging = boardsDao.paging(page);
+
+		// 2. 수정함
+		final int blockCount = 5;
+
+		int currentBlock = page / blockCount;
+		int startPageNum = 1 + blockCount * currentBlock;
+		int lastPageNum = 5 + blockCount * currentBlock;
+
+		if (paging.getTotalPage() < lastPageNum) {
+			lastPageNum = paging.getTotalPage();
+		}
+
+		paging.setBlockCount(blockCount);
+		paging.setCurrentBlock(currentBlock);
+		paging.setStartPageNum(startPageNum);
+		paging.setLastPageNum(lastPageNum);
+		paging.makeBlockInfo();
+
 		model.addAttribute("boardsList", boardsList);
+		model.addAttribute("paging", paging);
 		return "boards/main";
 	}
 	
@@ -75,7 +121,7 @@ public class BoardsController {
 //	}
 
 	@GetMapping("/boards/{id}")
-	public String getBoardList(@PathVariable Integer id, Model model) {
+	public String getBoardDetail(@PathVariable Integer id, Model model) {
 		model.addAttribute("boards",boardsDao.findById(id));
 		return "boards/detail";
 	}
