@@ -6,6 +6,7 @@ import lombok.Setter;
 @Setter
 @Getter
 public class PagingDto {
+	private String keyword;
 	private Integer blockCount;
 	private Integer currentBlock;
 	private Integer startPageNum;
@@ -18,7 +19,8 @@ public class PagingDto {
 	private boolean isLast;
 	private boolean isFirst;
 	
-	public void makeBlockInfo() {
+	public void makeBlockInfo(String keyword) {
+		this.keyword = keyword;
 		this.blockCount = 5;
 
 		this.currentBlock = currentPage / blockCount;

@@ -2,10 +2,10 @@ package site.metacoding.red.domain.boards;
 
 import java.sql.Timestamp;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import site.metacoding.red.web.dto.request.boards.UpdateDto;
 
 @NoArgsConstructor
 //setter는 잘 안쓰는게 좋음
@@ -22,6 +22,11 @@ public class Boards {
 		this.title = title;
 		this.content = content;
 		this.usersId = usersId;
+	}
+	
+	public void 글수정(UpdateDto updateDto) {
+		this.title = updateDto.getTitle();
+		this.content = updateDto.getContent();
 	}
 	
 	

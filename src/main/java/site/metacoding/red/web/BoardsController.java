@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import site.metacoding.red.domain.boards.Boards;
 import site.metacoding.red.domain.boards.BoardsDao;
 import site.metacoding.red.domain.users.Users;
+import site.metacoding.red.web.dto.request.boards.UpdateDto;
 import site.metacoding.red.web.dto.request.boards.WriteDto;
 import site.metacoding.red.web.dto.response.boards.MainDto;
 import site.metacoding.red.web.dto.response.boards.PagingDto;
@@ -24,15 +25,65 @@ public class BoardsController {
 
 	private final HttpSession session;
 	private final BoardsDao boardsDao;
-	
-	@PostMapping("/boards/{id}/delete")	// 원래 주소에 동사는 적으면 안됨!
-	public String deleteBoards(@PathVariable Integer id) { 
+
+	@PostMapping("/boards/{id}/update")  // update만 영속화-변경-수정!
+	public String update(@PathVariable Integer id, UpdateDto updateDto) {
+		Users principal = (Users) session.getAttribute("principal");
+		// 1. 영속화
+		Boards boardsPS = boardsDao.findById(id); 
+
+		// 비정상 요청 체크
+		if (boardsPS == null) {
+			return "errors/badPage";
+		}
+		// 인증 체크
+		if (principal == null) {
+			return "redirect:/loginForm";
+		}
+		// 권한 체크( 세션: principal.getId() & boardsPS의 userId를 비교 )
+		if (principal.getId() != boardsPS.getUsersId()) {
+			return "redirect:/boards/" + id;
+		}
+		
+		// 2. 변경
+		boardsPS.글수정(updateDto);
+		// 3. 수행
+		//boardsDao.update(updateDto.toEntity(id));
+		boardsDao.update(boardsPS);
+		
+		return "redirect:/boards/" + id;
+	}
+
+	@GetMapping("/boards/{id}/updateForm") // boards에 업데이트할 수 있는 폼을 주세요.
+	public String updateForm(@PathVariable Integer id, Model model) {
+		Users principal = (Users) session.getAttribute("principal");
+		Boards boardsPS = boardsDao.findById(id);
+
+		// 비정상 요청 체크
+		if (boardsPS == null) {
+			return "errors/badPage";
+		}
+		// 인증 체크
+		if (principal == null) {
+			return "redirect:/loginForm";
+		}
+		// 권한 체크( 세션: principal.getId() & boardsPS의 userId를 비교 )
+		if (principal.getId() != boardsPS.getUsersId()) {
+			return "redirect:/boards/" + id;
+		}
+
+		model.addAttribute("boards", boardsPS);
+		return "boards/updateForm"; // model에 담아서 가야함
+	}
+
+	@PostMapping("/boards/{id}/delete") // 원래 주소에 동사는 적으면 안됨!
+	public String deleteBoards(@PathVariable Integer id) {
 		// 1.영속화 시키기
 		Boards boardsPS = boardsDao.findById(id);
 		Users principal = (Users) session.getAttribute("principal");
 		// 비정상 요청 체크
-		if(boardsPS == null) {	// if는 비정상 로직을 하게 해서 걸러내는 필터 역할을 하는게 좋다.
-			return "redirect:/boards/"+id;   // 글 상세보기 주소로
+		if (boardsPS == null) { // if는 비정상 로직을 하게 해서 걸러내는 필터 역할을 하는게 좋다.
+			return "errors/badPage"; // 글 상세보기 주소로
 		}
 		// 화면의 수정,삭제 버튼이 본인만 보여야함
 		// 인증 체크
@@ -40,11 +91,11 @@ public class BoardsController {
 			return "redirect:/loginForm";
 		}
 		// 권한 체크( 세션: principal.getId() & boardsPS의 userId를 비교 )
-		if(principal.getId() != boardsPS.getUsersId()) {
-			return "redirect:/boards/"+id;
+		if (principal.getId() != boardsPS.getUsersId()) {
+			return "redirect:/boards/" + id;
 		}
-			
-		boardsDao.delete(id);		
+
+		boardsDao.delete(id); // 핵심 기능
 		return "redirect:/";
 	}
 
@@ -79,40 +130,41 @@ public class BoardsController {
 //		return "redirect:/";
 //	} // writeDto에 to ENTITY를 만들어서 쓰는게 위 코드보다 편함! // 인증체크도 해야함
 
-	
 	// http://localhost:8000/
 	// http://localhost:8000/?page=0
+	// 1번째 ?page=0&keyword=스프링
 	@GetMapping({ "/", "/boards" })
-	public String getBoardList(Model model, Integer page) { // 0 -> 0, 1->10, 2->20
-		if (page == null)
+	public String getBoardList(Model model, Integer page, String keyword) { // 0 -> 0, 1->10, 2->20
+		System.out.println("dddddddddd : keyword : "+keyword);
+		if (page == null) {
 			page = 0;
-		int startNum = page * 3; // 1. 수정함
-
-		List<MainDto> boardsList = boardsDao.findAll(startNum);
-		PagingDto paging = boardsDao.paging(page);
-
-		// 2. 수정함
-		final int blockCount = 5;
-
-		int currentBlock = page / blockCount;
-		int startPageNum = 1 + blockCount * currentBlock;
-		int lastPageNum = 5 + blockCount * currentBlock;
-
-		if (paging.getTotalPage() < lastPageNum) {
-			lastPageNum = paging.getTotalPage();
 		}
+		int startNum = page * 3; // 1. 수정함
+		
+		if (keyword == null || keyword.isEmpty()) {
+			System.out.println("=================================");
+			List<MainDto> boardsList = boardsDao.findAll(startNum);
+			PagingDto paging = boardsDao.paging(page, null);
+			paging.makeBlockInfo(keyword);
 
-		paging.setBlockCount(blockCount);
-		paging.setCurrentBlock(currentBlock);
-		paging.setStartPageNum(startPageNum);
-		paging.setLastPageNum(lastPageNum);
-		paging.makeBlockInfo();
+			model.addAttribute("boardsList", boardsList);
+			model.addAttribute("paging", paging);	
+		} else {
 
-		model.addAttribute("boardsList", boardsList);
-		model.addAttribute("paging", paging);
+			List<MainDto> boardsList = boardsDao.findSearch(startNum, keyword);
+			PagingDto paging = boardsDao.paging(page, keyword);
+			paging.makeBlockInfo(keyword);
+
+			model.addAttribute("boardsList", boardsList);
+			model.addAttribute("paging", paging);
+		}
 		return "boards/main";
+		
+
+		
+		
 	}
-	
+
 //	@GetMapping({ "/", "/boards" })
 //	public String getBoardList(Model model) {
 //		List<MainDto> boardsList = boardsDao.findAll();
@@ -122,7 +174,7 @@ public class BoardsController {
 
 	@GetMapping("/boards/{id}")
 	public String getBoardDetail(@PathVariable Integer id, Model model) {
-		model.addAttribute("boards",boardsDao.findById(id));
+		model.addAttribute("boards", boardsDao.findById(id));
 		return "boards/detail";
 	}
 
